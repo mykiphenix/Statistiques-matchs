@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Stats Match - Équipe</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#111827; --panel2:#1f2937; --text:#f8fafc; --muted:#94a3b8;
+    --good:#16a34a; --bad:#dc2626; --accent:#2563eb; --line:#334155; --warn:#f59e0b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+  button,input{font:inherit}
+  .app{max-width:1200px;margin:auto;padding:14px}
+  .topbar{display:grid;grid-template-columns:1.4fr auto auto;gap:10px;align-items:center;margin-bottom:12px}
+  .match-input{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:12px 14px;border-radius:12px;font-weight:700}
+  .clock{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:140px;text-align:center}
+  .clock strong{font-size:24px;display:block;letter-spacing:1px}
+  .clock small{color:var(--muted)}
+  .clock-actions{display:flex;gap:6px;margin-top:6px}
+  .btn{border:none;border-radius:10px;padding:10px 12px;color:white;cursor:pointer;font-weight:700}
+  .btn:active{transform:translateY(1px)}
+  .btn-accent{background:var(--accent)}
+  .btn-dark{background:var(--panel2);border:1px solid var(--line)}
+  .btn-warn{background:#92400e}
+  .layout{display:grid;grid-template-columns:1fr 1.5fr;gap:12px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px}
+  .panel h2{margin:4px 0 10px;font-size:18px}
+  .roster{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .player{background:var(--panel2);border:2px solid transparent;border-radius:14px;padding:12px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .player.active{border-color:#60a5fa;background:#172554}
+  .player .name{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .score{font-weight:900;font-size:20px;min-width:38px;text-align:right}
+  .score.pos{color:#4ade80}.score.neg{color:#f87171}
+  .actions-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .action{min-height:68px;border:none;border-radius:14px;color:white;padding:10px;font-weight:800;cursor:pointer}
+  .action.good{background:linear-gradient(145deg,#15803d,#16a34a)}
+  .action.bad{background:linear-gradient(145deg,#b91c1c,#dc2626)}
+  .action .val{display:block;font-size:14px;opacity:.85;margin-top:4px}
+  .selected{padding:10px 12px;border-radius:12px;background:#0b1220;border:1px dashed #475569;margin-bottom:10px}
+  .selected b{color:#93c5fd}
+  .history{margin-top:12px}
+  .history-list{max-height:340px;overflow:auto;border-top:1px solid var(--line)}
+  .event{display:grid;grid-template-columns:64px 1fr auto;gap:8px;padding:9px 4px;border-bottom:1px solid #253046;align-items:center}
+  .event small{color:var(--muted)}
+  .pill{padding:3px 8px;border-radius:999px;font-weight:800;font-size:12px}
+  .pill.good{background:#14532d}.pill.bad{background:#7f1d1d}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .manage{margin-top:10px;display:grid;grid-template-columns:1fr auto;gap:8px}
+  .manage input{background:#0b1220;border:1px solid var(--line);color:white;padding:10px;border-radius:10px}
+  .player-editor{margin-top:8px;display:flex;flex-wrap:wrap;gap:7px}
+  .chip{background:#0b1220;border:1px solid var(--line);padding:7px 9px;border-radius:999px;display:flex;gap:7px;align-items:center}
+  .chip button{border:none;background:transparent;color:#fca5a5;cursor:pointer;font-weight:900}
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+  .card{background:#0b1220;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+  .card strong{display:block;font-size:22px}
+  .card small{color:var(--muted)}
+  .hint{color:var(--muted);font-size:13px;line-height:1.4}
+  .footer{color:var(--muted);font-size:12px;text-align:center;padding:14px}
+  @media(max-width:820px){
+    .topbar{grid-template-columns:1fr}
+    .layout{grid-template-columns:1fr}
+    .roster{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .actions-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
+  @media(max-width:480px){
+    .app{padding:8px}
+    .roster{grid-template-columns:1fr 1fr}
+    .player{padding:10px}
+    .action{min-height:62px;font-size:14px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <input id="matchName" class="match-input" value="Match amical" aria-label="Nom du match">
+    <div class="clock">
+      <strong id="clockText">00:00</strong>
+      <small>Chrono de saisie</small>
+      <div class="clock-actions">
+        <button class="btn btn-accent" id="clockToggle">Démarrer</button>
+        <button class="btn btn-dark" id="clockReset">↺</button>
+      </div>
+    </div>
+    <button class="btn btn-warn" id="newMatch">Nouveau match</button>
+  </div>
+
+  <div class="layout">
+    <section class="panel">
+      <h2>1. Choisir une joueuse</h2>
+      <div class="summary">
+        <div class="card"><strong id="teamScore">0</strong><small>Score cumulé</small></div>
+        <div class="card"><strong id="eventCount">0</strong><small>Actions</small></div>
+        <div class="card"><strong id="playerCount">0</strong><small>Joueuses</small></div>
+      </div>
+      <div id="roster" class="roster"></div>
+
+      <h2 style="margin-top:16px">Effectif</h2>
+      <div class="manage">
+        <input id="newPlayerName" placeholder="Nom de la joueuse">
+        <button class="btn btn-accent" id="addPlayer">Ajouter</button>
+      </div>
+      <div id="playerEditor" class="player-editor"></div>
+      <p class="hint">Astuce : double-clique sur une joueuse dans l’effectif pour la renommer. Tu peux aussi la définir comme <b>Gardienne</b> pour afficher ses actions spécifiques.</p>
+    </section>
+
+    <section class="panel">
+      <h2>2. Encoder l'action</h2>
+      <div class="selected" id="selectedText">Sélectionne d'abord une joueuse.</div>
+
+      <div class="actions-grid" id="actionsGrid"></div>
+
+      <div class="toolbar">
+        <button class="btn btn-dark" id="undoBtn">↶ Annuler dernière action</button>
+        <button class="btn btn-dark" id="exportBtn">Exporter CSV</button>
+        <button class="btn btn-dark" id="copySummaryBtn">Copier le résumé</button>
+      </div>
+
+      <div class="history">
+        <h2>Historique</h2>
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </section>
+  </div>
+  <div class="footer">Les données restent dans ce navigateur grâce au stockage local. Aucune connexion Internet n'est nécessaire après ouverture du fichier.</div>
+</div>
+
+<script>
+const DEFAULT_PLAYERS = [
+  "#4 Joueuse 1","#5 Joueuse 2","#6 Joueuse 3","#7 Joueuse 4",
+  "#8 Joueuse 5","#9 Joueuse 6","#10 Joueuse 7","#11 Joueuse 8"
+];
+
+const FIELD_ACTIONS = [
+  {id:"but", label:"But", value:1, good:true},
+  {id:"passe", label:"Passe décisive", value:1, good:true},
+  {id:"faute_off", label:"Faute offensive provoquée", value:1, good:true},
+  {id:"perte", label:"Perte de balle", value:-1, good:false},
+  {id:"mauvaise_passe", label:"Mauvaise passe", value:-1, good:false},
+  {id:"marcher", label:"Marcher", value:-1, good:false},
+  {id:"passage_force", label:"Passage en force", value:-1, good:false},
+  {id:"but_secteur", label:"But pris dans son secteur", value:-1, good:false}
+];
+
+const GOALKEEPER_ACTIONS = [
+  {id:"arret", label:"Arrêt", value:1, good:true},
+  {id:"penalty_arrete", label:"Penalty arrêté", value:2, good:true},
+  {id:"bonne_relance", label:"Bonne relance", value:1, good:true},
+  {id:"mauvaise_relance", label:"Mauvaise relance", value:-1, good:false},
+  {id:"but_evitable", label:"But évitable", value:-1, good:false},
+  {id:"grosse_erreur", label:"Grosse erreur", value:-2, good:false}
+];
+
+function migrateState(raw){
+  if(!raw) return {
+    matchName:"Match amical",
+    players:DEFAULT_PLAYERS.map(name=>({id:crypto.randomUUID(),name,role:"field"})),
+    events:[],
+    selectedId:null,
+    elapsed:0,
+    running:false,
+    startedAt:null
+  };
+  raw.players = (raw.players || []).map(p => ({
+    ...p,
+    role: p.role || "field"
+  }));
+  return raw;
+}
+
+let state = migrateState(JSON.parse(localStorage.getItem("matchStatsState") || "null"));
+
+const $ = s => document.querySelector(s);
+
+function allActions(){
+  return [...FIELD_ACTIONS, ...GOALKEEPER_ACTIONS];
+}
+function actionsForPlayer(p){
+  return p?.role === "goalkeeper" ? GOALKEEPER_ACTIONS : FIELD_ACTIONS;
+}
+
+function save(){
+  state.matchName = $("#matchName").value.trim() || "Match";
+  localStorage.setItem("matchStatsState", JSON.stringify(state));
+}
+
+function playerScore(id){
+  return state.events.filter(e=>e.playerId===id).reduce((s,e)=>s+e.value,0);
+}
+function totalScore(){ return state.events.reduce((s,e)=>s+e.value,0); }
+
+function formatTime(sec){
+  const m=Math.floor(sec/60).toString().padStart(2,"0");
+  const s=(sec%60).toString().padStart(2,"0");
+  return `${m}:${s}`;
+}
+function currentElapsed(){
+  if(!state.running) return state.elapsed;
+  return state.elapsed + Math.floor((Date.now()-state.startedAt)/1000);
+}
+
+function renderRoster(){
+  const r=$("#roster"); r.innerHTML="";
+  state.players.forEach(p=>{
+    const b=document.createElement("button");
+    b.className="player"+(state.selectedId===p.id?" active":"");
+    const sc=playerScore(p.id);
+    const roleIcon = p.role === "goalkeeper" ? "🧤 " : "";
+    b.innerHTML=`<span class="name">${roleIcon}${escapeHtml(p.name)}</span><span class="score ${sc>0?'pos':sc<0?'neg':''}">${sc>0?'+':''}${sc}</span>`;
+    b.onclick=()=>{state.selectedId=p.id; save(); render();};
+    r.appendChild(b);
+  });
+  $("#playerCount").textContent=state.players.length;
+  $("#teamScore").textContent=(totalScore()>0?"+":"")+totalScore();
+  $("#eventCount").textContent=state.events.length;
+}
+
+function renderActions(){
+  const g=$("#actionsGrid"); g.innerHTML="";
+  const p=state.players.find(p=>p.id===state.selectedId);
+  const actions = actionsForPlayer(p);
+
+  actions.forEach(a=>{
+    const b=document.createElement("button");
+    b.className=`action ${a.good?"good":"bad"}`;
+    b.innerHTML=`${escapeHtml(a.label)}<span class="val">${a.value>0?"+":""}${a.value}</span>`;
+    b.onclick=()=>recordAction(a);
+    g.appendChild(b);
+  });
+
+  if(p){
+    const role = p.role === "goalkeeper" ? "Gardienne 🧤" : "Joueuse de champ";
+    $("#selectedText").innerHTML=
+      `Joueuse sélectionnée : <b>${escapeHtml(p.name)}</b> · ${role} · score actuel <b>${playerScore(p.id)>0?"+":""}${playerScore(p.id)}</b>`;
+  } else {
+    $("#selectedText").innerHTML="Sélectionne d'abord une joueuse.";
+  }
+}
+
+function renderHistory(){
+  const h=$("#historyList"); h.innerHTML="";
+  const actions = allActions();
+  [...state.events].reverse().slice(0,100).forEach(e=>{
+    const p=state.players.find(p=>p.id===e.playerId);
+    const a=actions.find(a=>a.id===e.actionId);
+    const d=document.createElement("div");
+    d.className="event";
+    d.innerHTML=`<small>${formatTime(e.t)}</small><div><b>${escapeHtml(p?.name||"Joueuse")}</b><br><small>${escapeHtml(a?.label||e.actionId)}</small></div><span class="pill ${e.value>0?"good":"bad"}">${e.value>0?"+":""}${e.value}</span>`;
+    h.appendChild(d);
+  });
+  if(state.events.length===0) h.innerHTML='<div class="hint" style="padding:12px 4px">Aucune action enregistrée.</div>';
+}
+
+function renderEditor(){
+  const e=$("#playerEditor"); e.innerHTML="";
+  state.players.forEach(p=>{
+    const c=document.createElement("span"); c.className="chip";
+    const name=document.createElement("span");
+    name.textContent=(p.role==="goalkeeper"?"🧤 ":"")+p.name;
+    name.title="Double-cliquer pour renommer";
+    name.ondblclick=()=>{
+      const n=prompt("Nouveau nom :",p.name);
+      if(n&&n.trim()){p.name=n.trim(); save(); render();}
+    };
+
+    const roleBtn=document.createElement("button");
+    roleBtn.textContent = p.role === "goalkeeper" ? "Champ" : "Gard.";
+    roleBtn.title = p.role === "goalkeeper" ? "Passer en joueuse de champ" : "Définir comme gardienne";
+    roleBtn.style.color = p.role === "goalkeeper" ? "#93c5fd" : "#cbd5e1";
+    roleBtn.onclick=()=>{
+      p.role = p.role === "goalkeeper" ? "field" : "goalkeeper";
+      save(); render();
+    };
+
+    const x=document.createElement("button"); x.textContent="×"; x.title="Supprimer";
+    x.onclick=()=>{
+      if(confirm(`Supprimer ${p.name} ?`)){
+        state.players=state.players.filter(x=>x.id!==p.id);
+        if(state.selectedId===p.id) state.selectedId=null;
+        save(); render();
+      }
+    };
+    c.append(name,roleBtn,x); e.appendChild(c);
+  });
+}
+
+function render(){
+  renderRoster(); renderActions(); renderHistory(); renderEditor();
+  $("#matchName").value=state.matchName;
+  $("#clockToggle").textContent=state.running?"Pause":"Démarrer";
+  $("#clockText").textContent=formatTime(currentElapsed());
+}
+
+function recordAction(a){
+  if(!state.selectedId){ alert("Choisis d'abord une joueuse."); return; }
+  state.events.push({
+    id:crypto.randomUUID(), playerId:state.selectedId, actionId:a.id,
+    value:a.value, t:currentElapsed(), at:new Date().toISOString()
+  });
+  save(); render();
+}
+
+$("#undoBtn").onclick=()=>{
+  if(state.events.length===0) return;
+  state.events.pop(); save(); render();
+};
+
+$("#addPlayer").onclick=()=>{
+  const inp=$("#newPlayerName"), n=inp.value.trim();
+  if(!n) return;
+  state.players.push({id:crypto.randomUUID(),name:n,role:"field"});
+  inp.value=""; save(); render();
+};
+$("#newPlayerName").addEventListener("keydown",e=>{if(e.key==="Enter") $("#addPlayer").click();});
+$("#matchName").addEventListener("input",save);
+
+$("#clockToggle").onclick=()=>{
+  if(state.running){
+    state.elapsed=currentElapsed(); state.running=false; state.startedAt=null;
+  }else{
+    state.running=true; state.startedAt=Date.now();
+  }
+  save(); render();
+};
+$("#clockReset").onclick=()=>{
+  if(confirm("Remettre le chrono à 00:00 ?")){
+    state.elapsed=0; state.startedAt=state.running?Date.now():null; save(); render();
+  }
+};
+setInterval(()=>{$("#clockText").textContent=formatTime(currentElapsed());},500);
+
+$("#newMatch").onclick=()=>{
+  if(!confirm("Créer un nouveau match ? L'historique actuel sera effacé. Pense à exporter le CSV avant si nécessaire.")) return;
+  state.events=[]; state.selectedId=null; state.elapsed=0; state.running=false; state.startedAt=null;
+  $("#matchName").value="Nouveau match"; state.matchName="Nouveau match"; save(); render();
+};
+
+$("#exportBtn").onclick=()=>{
+  const actions=allActions();
+  const rows=[["match","temps","joueuse","poste","action","valeur","horodatage"]];
+  state.events.forEach(e=>{
+    const p=state.players.find(p=>p.id===e.playerId);
+    const a=actions.find(a=>a.id===e.actionId);
+    rows.push([
+      state.matchName,
+      formatTime(e.t),
+      p?.name||"",
+      p?.role==="goalkeeper"?"Gardienne":"Champ",
+      a?.label||e.actionId,
+      e.value,
+      e.at
+    ]);
+  });
+  rows.push([]);
+  rows.push(["RÉSUMÉ","","","","","",""]);
+  state.players.forEach(p=>{
+    rows.push([
+      state.matchName,"",p.name,
+      p.role==="goalkeeper"?"Gardienne":"Champ",
+      "Score",playerScore(p.id),""
+    ]);
+    actionsForPlayer(p).forEach(a=>{
+      const count=state.events.filter(e=>e.playerId===p.id&&e.actionId===a.id).length;
+      if(count) rows.push([state.matchName,"",p.name,p.role==="goalkeeper"?"Gardienne":"Champ",a.label,count,""]);
+    });
+  });
+  const csv=rows.map(r=>r.map(v=>`"${String(v??"").replaceAll('"','""')}"`).join(";")).join("\n");
+  const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob), a=document.createElement("a");
+  a.href=url; a.download=(state.matchName||"match").replace(/[^\w\-]+/g,"_")+"_stats.csv"; a.click(); URL.revokeObjectURL(url);
+};
+
+$("#copySummaryBtn").onclick=async()=>{
+  let t=`${state.matchName}\n\n`;
+  const ordered=[...state.players].sort((a,b)=>playerScore(b.id)-playerScore(a.id));
+  ordered.forEach(p=>{
+    t+=`${p.role==="goalkeeper"?"🧤 ":""}${p.name}: ${playerScore(p.id)>0?"+":""}${playerScore(p.id)}\n`;
+    actionsForPlayer(p).forEach(a=>{
+      const n=state.events.filter(e=>e.playerId===p.id&&e.actionId===a.id).length;
+      if(n) t+=`  • ${a.label}: ${n}\n`;
+    });
+  });
+  try{await navigator.clipboard.writeText(t); alert("Résumé copié.");}
+  catch{prompt("Copie ce résumé :",t);}
+};
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+render();
+</script>
+</body>
+</html>
